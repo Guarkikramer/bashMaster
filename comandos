@@ -1,0 +1,441 @@
+que te parece como me esta quedadno mi basrhc 
+#Funciones para comandos
+
+# Función base para conversión de archivos
+convert_file() {
+  local input_file="$1"
+  local output_format="$2"
+  local ask_for_name="$3"
+
+  # Verificar si se proporcionó un archivo
+  if [ -z "$input_file" ]; then
+    read -p "Introduce el nombre del archivo (con extensión): " input_file
+  fi
+
+  # Verificar si el archivo existe
+  if [ ! -f "$input_file" ]; then
+    echo "Error: El archivo '$input_file' no existe."
+    return 1
+  fi
+
+  # Obtener el nombre base del archivo (sin extensión)
+  local base_name="${input_file%.*}"
+
+  # Preguntar por el nombre de salida si se usa el parámetro -a
+  local output_file
+  if [ "$ask_for_name" = "true" ]; then
+    read -p "Introduce el nombre del archivo de salida (sin extensión): " custom_name
+    output_file="${custom_name}.${output_format}"
+  else
+    output_file="${base_name}.${output_format}"
+  fi
+
+  # Convertir el archivo usando Pandoc
+  echo "Convirtiendo '$input_file' a $output_format..."
+  pandoc -o "$output_file" "$input_file"
+
+  # Verificar si la conversión fue exitosa
+  if [ $? -eq 0 ]; then
+    echo "Archivo convertido con éxito: $output_file"
+  else
+    echo "Error: No se pudo convertir el archivo '$input_file'."
+    return 1
+  fi
+}
+
+# Funciones específicas para cada formato
+topdf() {
+  convert_file "$1" "pdf" "$([ "$2" = "-a" ] && echo "true" || echo "false")"
+}
+
+tohtml() {
+  convert_file "$1" "html" "$([ "$2" = "-a" ] && echo "true" || echo "false")"
+}
+
+tomarkdown() {
+  convert_file "$1" "md" "$([ "$2" = "-a" ] && echo "true" || echo "false")"
+}
+
+todocx() {
+  convert_file "$1" "docx" "$([ "$2" = "-a" ] && echo "true" || echo "false")"
+}
+
+totxt() {
+  convert_file "$1" "txt" "$([ "$2" = "-a" ] && echo "true" || echo "false")"
+}
+
+toepub() {
+  convert_file "$1" "epub" "$([ "$2" = "-a" ] && echo "true" || echo "false")"
+}
+
+# Convertir imágenes a PNG
+toPng() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo."
+    return 1
+  fi
+  convert "$1" "${1%.*}.png"
+  echo "Imagen convertida a PNG: ${1%.*}.png"
+}
+
+# Convertir imágenes a JPG
+toJpg() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo."
+    return 1
+  fi
+  convert "$1" "${1%.*}.jpg"
+  echo "Imagen convertida a JPG: ${1%.*}.jpg"
+}
+
+# Convertir imágenes a SVG (solo para ciertos formatos)
+toSvg() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo."
+    return 1
+  fi
+  convert "$1" "${1%.*}.svg"
+  echo "Imagen convertida a SVG: ${1%.*}.svg"
+}
+
+# Convertir imágenes a GIF
+toGif() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo."
+    return 1
+  fi
+  convert "$1" "${1%.*}.gif"
+  echo "Imagen convertida a GIF: ${1%.*}.gif"
+}
+
+# Redimensionar imágenes
+redimensionar() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo."
+    return 1
+  fi
+
+  read -p "Introduce el porcentaje de redimensionamiento (ejemplo: 50 para reducir a la mitad, 200 para duplicar): " porcentaje
+
+  if [[ ! "$porcentaje" =~ ^-?[0-9]+$ ]]; then
+    echo "Error: El porcentaje debe ser un número entero."
+    return 1
+  fi
+
+  local output_file="${1%.*}_resized.${1##*.}"
+  convert "$1" -resize "$porcentaje%" "$output_file"
+  echo "Imagen redimensionada: $output_file"
+}
+
+
+#Funcion start la cual sirve para inciar el ordenador
+start() {
+  echo "Actualizando dependencias del sistema..."
+  sudo apt update && sudo apt upgrade -y
+
+  echo "Iniciando NordVPN..."
+  if ! command -v nordvpn &> /dev/null; then
+    echo "Error: NordVPN no está instalado."
+    return 1
+  fi
+
+  # Conectar a un servidor en España
+  nordvpn connect Spain
+
+  # Verificar la conexión
+  if nordvpn status | grep -q "Status: Connected"; then
+    echo "Conexión a NordVPN establecida correctamente."
+  else
+    echo "Error: No se pudo conectar a NordVPN."
+    return 1
+  fi
+}
+
+#Funciones para pasar un archibo a ebook
+toebook() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo."
+    return 1
+  fi
+
+  if [ ! -f "$1" ]; then
+    echo "Error: El archivo '$1' no existe."
+    return 1
+  fi
+
+  local output_file
+  if [ "$2" = "-a" ]; then
+    read -p "Introduce el nombre del archivo de salida (sin extensión): " custom_name
+    output_file="${custom_name}.epub"
+  else
+    output_file="${1%.*}.epub"
+  fi
+
+  # Verificar si ebook-convert está instalado
+  if ! command -v ebook-convert &> /dev/null; then
+    echo "Error: ebook-convert no está instalado. Instala Calibre primero."
+    return 1
+  fi
+
+  # Verificar el formato de entrada
+  local input_format="${1##*.}"
+  if [[ "$input_format" != "pdf" && "$input_format" != "html" && "$input_format" != "txt" ]]; then
+    echo "Error: El formato de entrada '$input_format' no es compatible."
+    echo "Formatos admitidos: PDF, HTML, TXT."
+    return 1
+  fi
+
+  # Opciones avanzadas de ebook-convert
+  local options=""
+  if [ "$3" = "--high-quality" ]; then
+    options="--base-font-size 12 --margin-left 20 --margin-right 20 --output-profile tablet"
+  fi
+
+  # Convertir el archivo
+  echo "Convirtiendo '$1' a EPUB..."
+  ebook-convert "$1" "$output_file" $options
+
+  # Verificar si la conversión fue exitosa
+  if [ $? -eq 0 ]; then
+    echo "Archivo convertido con éxito: $output_file"
+  else
+    echo "Error: No se pudo convertir el archivo '$1'."
+    return 1
+  fi
+}
+ #utilidades de pyhton 
+alias pitones="python3 -m venv env"
+alias pipact="source env/bin/activate"
+#alias para eliminar un archivo 
+del() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo o carpeta."
+    return 1
+  fi
+
+  for item in "$@"; do
+    if [ -f "$item" ]; then
+      # Es un archivo
+      echo "Eliminando archivo: $item"
+      rm -f "$item"
+    elif [ -d "$item" ]; then
+      # Es un directorio
+      echo "Eliminando carpeta: $item"
+      rm -rf "$item"
+    else
+      # No es un archivo ni un directorio
+      echo "Error: '$item' no es un archivo ni una carpeta."
+      return 1
+    fi
+  done
+
+  echo "Operación completada."
+}
+#Descargar videos
+# Comando interactivo para descargar contenido de YouTue
+
+yt() {
+  # Ruta correcta del entorno virtual
+  local venv_path="/home/wuarkikramer/Documentos/python/env/bin/activate"
+
+  # Intentar activar el entorno virtual
+  if [ -f "$venv_path" ]; then
+    source "$venv_path"
+    echo "Entorno virtual activado correctamente."
+  else
+    echo "Error: No se pudo encontrar el entorno virtual en $venv_path."
+    return 1
+  fi
+
+  # Verificar si se proporcionó una URL
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar la URL del video."
+    deactivate  # Desactivar el entorno si fue activado
+    return 1
+  fi
+
+  local url="$1"
+  echo "Selecciona una opción:"
+  echo "1) Descargar audio en formato MP3"
+  echo "2) Descargar video en formato MP4"
+  echo "3) Descargar video en la máxima calidad disponible"
+  echo "4) Descargar audio en la máxima calidad disponible"
+  echo "5) Descargar video con logs detallados (para depuración)"
+  echo "6) Ver los formatos disponibles y descargar uno"
+
+  read -p "Opción (1-6): " option
+
+  case "$option" in
+    1)
+      echo "Descargando audio en formato MP3: $url"
+      yt-dlp -x --audio-format mp3 -o "%(title)s.%(ext)s" "$url"
+      ;;
+    2)
+      echo "Descargando video en formato MP4: $url"
+      yt-dlp -f "mp4" -o "%(title)s.%(ext)s" "$url"
+      ;;
+    3)
+      echo "Descargando video en la máxima calidad disponible: $url"
+      yt-dlp -f "bestvideo+bestaudio" -o "%(title)s.%(ext)s" "$url"
+      ;;
+    4)
+      echo "Descargando audio en la máxima calidad disponible: $url"
+      yt-dlp -x --audio-format best -o "%(title)s.%(ext)s" "$url"
+      ;;
+    5)
+      echo "Descargando video con logs detallados: $url"
+      yt-dlp -v -o "%(title)s.%(ext)s" "$url"
+      ;;
+    6)
+      echo "Obteniendo lista de formatos disponibles para el video: $url"
+      yt-dlp -F "$url"  # Mostrar los formatos disponibles
+      read -p "Ingresa el código del formato que deseas descargar: " format_code
+      echo "Descargando el formato seleccionado: $url"
+      yt-dlp -f "$format_code" -o "%(title)s.%(ext)s" "$url"  # Descargar el formato elegido
+      ;;
+    *)
+      echo "Error: Opción no válida."
+      deactivate  # Desactivar el entorno si la opción no es válida
+      return 1
+      ;;
+  esac
+
+  # Desactivar el entorno virtual después de la ejecución si fue activado
+  if type deactivate &>/dev/null; then
+    deactivate
+    echo "Entorno virtual desactivado."
+  fi
+
+  # Verificar si la descarga fue exitosa
+  if [ $? -eq 0 ]; then
+    echo "Descarga completada."
+  else
+    echo "Error: No se pudo completar la descarga."
+  fi
+}
+
+# Comando para hacer archivos ejecutables y manejarlos según su tipo
+instalable() {
+  if [ -z "$1" ]; then
+    echo "Error: Debes especificar un archivo."
+    return 1
+  fi
+
+  if [ ! -f "$1" ]; then
+    echo "Error: El archivo '$1' no existe."
+    return 1
+  fi
+
+  local file="$1"
+  local extension="${file##*.}"
+
+  # Hacer el archivo ejecutable
+  echo "Haciendo ejecutable: $file"
+  chmod +x "$file"
+
+  # Manejar el archivo según su tipo
+  case "$extension" in
+    deb)
+      echo "Instalando paquete .deb: $file"
+      sudo dpkg -i "$file" || sudo apt install -f
+      ;;
+    run)
+      echo "Ejecutando archivo .run: $file"
+      sudo ./"$file"
+      ;;
+    sh|bash)
+      echo "Ejecutando script: $file"
+      ./"$file"
+      ;;
+    *)
+      echo "El archivo '$file' es ejecutable, pero no es un tipo instalable (.deb, .run, .sh, .bash)."
+      ;;
+  esac
+
+  echo "Operación completada."
+}
+#Comando para buscar archivos
+buscar() {
+  if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Uso: buscar <directorio> <patrón>"
+    return 1
+  fi
+  find "$1" -name "*$2*"
+}
+
+#Limpiar Ordenador
+limpiar() {
+  sudo apt clean
+  sudo apt autoremove -y
+  echo "Sistema limpiado."
+}
+#Reiniciar 
+reiniciar() {
+  sudo reboot
+}
+
+apagar() {
+  sudo shutdown now
+}
+crear_proyecto() {
+  if [ -z "$1" ]; then
+    echo "Uso: crear_proyecto <nombre_proyecto>"
+    return 1
+  fi
+  mkdir -p "$1"/{src,tests,docs}
+  touch "$1"/README.md "$1"/src/main.py
+  echo "Proyecto '$1' creado."
+}
+generar_password() {
+  local longitud="${1:-12}"
+  tr -dc 'A-Za-z0-9!@#$%^&*()' < /dev/urandom | head -c "$longitud"
+  echo
+
+generar_password() {
+  local longitud="${1:-12}"
+  tr -dc 'A-Za-z0-9!@#$%^&*()' < /dev/urandom | head -c "$longitud"
+  echo
+}}
+pomodoro() {
+  # Preguntar por el tiempo de trabajo
+  read -p "Introduce el tiempo de trabajo en minutos (por defecto 25): " trabajo
+  trabajo=${trabajo:-25}  # Si no se introduce nada, usar 25 minutos
+
+  # Preguntar por el tiempo de descanso
+  read -p "Introduce el tiempo de descanso en minutos (por defecto 5): " descanso
+  descanso=${descanso:-5}  # Si no se introduce nada, usar 5 minutos
+
+  # Validar que los valores sean números positivos
+  if ! [[ "$trabajo" =~ ^[0-9]+$ ]] || ! [[ "$descanso" =~ ^[0-9]+$ ]]; then
+    echo "Error: Los tiempos deben ser números enteros positivos."
+    return 1
+  fi
+
+  # Iniciar el temporizador de trabajo
+  echo "Pomodoro iniciado: $trabajo minutos de trabajo."
+  sleep "${trabajo}m"
+
+  # Notificar el fin del tiempo de trabajo
+  echo "¡Tiempo de descanso! ($descanso minutos)"
+  notify-send "Pomodoro" "¡Tiempo de descanso! ($descanso minutos)"  # Notificación visual (opcional)
+
+  # Iniciar el temporizador de descanso
+  sleep "${descanso}m"
+
+  # Notificar el fin del descanso
+  echo "Descanso terminado."
+  notify-send "Pomodoro" "Descanso terminado. ¡Volvamos al trabajo!"  # Notificación visual (opcional)
+}
+
+nota() {
+  if [ -z "$1" ]; then
+    echo "Uso: nota <texto>"
+    return 1
+  fi
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> ~/notas.txt
+  echo "Nota guardada."
+}
+#Utilidades
+alias music="spotify"
+alias ram="free -h"
+alias was="whatsapp-desktop"
